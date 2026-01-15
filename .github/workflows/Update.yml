@@ -1,0 +1,51 @@
+name: Update
+
+on:
+  schedule:
+    - cron: 0 * * * *
+
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  Update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: GetTime
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d %H:%M:%S CST')"
+
+    - name: Update
+      run: |
+        # fanmingming
+        rm -f fanmingming.m3u && touch fanmingming.m3u
+        wget https://scrm-community.oss-cn-shenzhen.aliyuncs.com/miniso-vendor/20250425-868403-298462cec53c48439a5765ceaca3c67f.m3u -O fanmingming.m3u
+        sed -i '1i #EXTM3U' fanmingming.m3u
+        sed -i '/^\s*$/d' fanmingming.m3u
+                                    
+        # 整合源
+        rm -f IPTV.m3u && touch IPTV.m3u
+        cat fanmingming.m3u >> IPTV.m3u
+        cat nc.m3u >> IPTV.m3u
+        cat gz.m3u >> IPTV.m3u
+        sed -i '/#EXTM3U/d' IPTV.m3u
+        sed -i '1i #EXTM3U' IPTV.m3u
+        sed -i '/^\s*$/d' IPTV.m3u
+        
+        # 节目源
+        rm -f EPG.xml && wget https://epg.112114.xyz/pp.xml -O EPG.xml
+        echo "Auto Update IPTV in ${{ steps.date.outputs.date }}" > README.md
+    - name: Clean
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git checkout --orphan latest_branch
+        git add -A
+        git commit -am "${{ steps.date.outputs.date }}"
+        git branch -D Files
+        git branch -m Files
+    - name: Push
+      run: git push -f origin Files
